@@ -238,6 +238,9 @@ class DiT(nn.Module):
         y: (N,) tensor of class labels
         """
         # Log forward pass execution (using print to stdout for notebook compatibility)
+        # stdout is used to print to the notebook
+        import sys
+        print("[DiT Forward] Batch, Timesteps: ...", file=sys.stdout)
         print("[DiT Forward] Batch, Timesteps: ...")
         
         # skip = self.x_embedder(x)                                # preserve pre-block representation
