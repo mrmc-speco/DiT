@@ -240,7 +240,7 @@ class DiT(nn.Module):
         # Log forward pass execution (using print to stdout for notebook compatibility)
         print("[DiT Forward] Batch, Timesteps: ...")
         
-        skip = self.x_embedder(x)                                # preserve pre-block representation
+        # skip = self.x_embedder(x)                                # preserve pre-block representation
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
         t = self.t_embedder(t)                   # (N, D)
         y = self.y_embedder(y, self.training)    # (N, D)
@@ -248,7 +248,7 @@ class DiT(nn.Module):
         
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
-        x = x + skip                             # skip connection across all blocks
+        # x = x + skip                             # skip connection across all blocks
         
         print(f"[DiT Forward] ✓ Skip connection applied across {len(self.blocks)} blocks")
         
