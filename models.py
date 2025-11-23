@@ -241,8 +241,10 @@ class DiT(nn.Module):
         t = self.t_embedder(t)                   # (N, D)
         y = self.y_embedder(y, self.training)    # (N, D)
         c = t + y                                # (N, D)
+        skip = x                                 # preserve pre-block representation
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
+        x = x + skip                             # skip connection across all blocks
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
         x = self.unpatchify(x)                   # (N, out_channels, H, W)
         return x
