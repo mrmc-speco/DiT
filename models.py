@@ -341,9 +341,11 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
 #################################################################################
 
 def DiT_XL_2(**kwargs):
+    print("Creating DiT-XL/2 model...")
     return DiT(depth=28, hidden_size=1152, patch_size=2, num_heads=16, **kwargs)
 
 def DiT_XL_4(**kwargs):
+    print("Creating DiT-XL/4 model...")
     return DiT(depth=28, hidden_size=1152, patch_size=4, num_heads=16, **kwargs)
 
 def DiT_XL_8(**kwargs):
