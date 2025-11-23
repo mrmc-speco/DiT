@@ -238,13 +238,13 @@ class DiT(nn.Module):
         y: (N,) tensor of class labels
         """
         # Log forward pass execution (using print to stdout for notebook compatibility)
-        print(f"[DiT Forward] Batch, Timesteps: ...")
+        print("[DiT Forward] Batch, Timesteps: ...")
         
+        skip = self.x_embedder(x)                                # preserve pre-block representation
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
         t = self.t_embedder(t)                   # (N, D)
         y = self.y_embedder(y, self.training)    # (N, D)
         c = t + y                                # (N, D)
-        skip = x                                 # preserve pre-block representation
         
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
