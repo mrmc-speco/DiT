@@ -237,14 +237,27 @@ class DiT(nn.Module):
         t: (N,) tensor of diffusion timesteps
         y: (N,) tensor of class labels
         """
+        # Log forward pass execution
+        import sys
+        print(f"\n[DiT Forward] Batch shape: {x.shape}, Timestep range: [{t.min().item():.2f}, {t.max().item():.2f}], Classes: {y.tolist()}", 
+              file=sys.stderr, flush=True)
+        
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
         t = self.t_embedder(t)                   # (N, D)
         y = self.y_embedder(y, self.training)    # (N, D)
         c = t + y                                # (N, D)
         skip = x                                 # preserve pre-block representation
+        
+        print(f"[DiT Forward] Processing {len(self.blocks)} blocks with skip connection...", 
+              file=sys.stderr, flush=True)
+        
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
         x = x + skip                             # skip connection across all blocks
+        
+        print(f"[DiT Forward] Skip connection applied, output shape: {x.shape}", 
+              file=sys.stderr, flush=True)
+        
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
         x = self.unpatchify(x)                   # (N, out_channels, H, W)
         return x
