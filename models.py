@@ -237,10 +237,8 @@ class DiT(nn.Module):
         t: (N,) tensor of diffusion timesteps
         y: (N,) tensor of class labels
         """
-        # Log forward pass execution
-        import sys
-        print(f"\n[DiT Forward] Batch shape: {x.shape}, Timestep range: [{t.min().item():.2f}, {t.max().item():.2f}], Classes: {y.tolist()}", 
-              file=sys.stderr, flush=True)
+        # Log forward pass execution (using print to stdout for notebook compatibility)
+        print(f"[DiT Forward] Batch: {x.shape}, Timesteps: [{t.min().item():.0f}-{t.max().item():.0f}], Classes: {y[:4].tolist()}...")
         
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
         t = self.t_embedder(t)                   # (N, D)
@@ -248,15 +246,11 @@ class DiT(nn.Module):
         c = t + y                                # (N, D)
         skip = x                                 # preserve pre-block representation
         
-        print(f"[DiT Forward] Processing {len(self.blocks)} blocks with skip connection...", 
-              file=sys.stderr, flush=True)
-        
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
         x = x + skip                             # skip connection across all blocks
         
-        print(f"[DiT Forward] Skip connection applied, output shape: {x.shape}", 
-              file=sys.stderr, flush=True)
+        print(f"[DiT Forward] ✓ Skip connection applied across {len(self.blocks)} blocks")
         
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
         x = self.unpatchify(x)                   # (N, out_channels, H, W)
@@ -266,16 +260,13 @@ class DiT(nn.Module):
         """
         Forward pass of DiT, but also batches the unconditional forward pass for classifier-free guidance.
         """
-        import sys
-        print(f"\n{'='*60}", file=sys.stderr, flush=True)
-        print(f"[DiT CFG] Input shape: {x.shape}, CFG scale: {cfg_scale}", file=sys.stderr, flush=True)
-        print(f"{'='*60}", file=sys.stderr, flush=True)
+        print(f"\n{'='*60}")
+        print(f"[CFG] Input: {x.shape}, CFG scale: {cfg_scale}")
         
         # https://github.com/openai/glide-text2im/blob/main/notebooks/text2im.ipynb
         half = x[: len(x) // 2]
         combined = torch.cat([half, half], dim=0)
         
-        print(f"[DiT CFG] Calling forward() with combined batch...", file=sys.stderr, flush=True)
         model_out = self.forward(combined, t, y)
         
         # For exact reproducibility reasons, we apply classifier-free guidance on only
@@ -287,9 +278,8 @@ class DiT(nn.Module):
         half_eps = uncond_eps + cfg_scale * (cond_eps - uncond_eps)
         eps = torch.cat([half_eps, half_eps], dim=0)
         
-        print(f"[DiT CFG] Guidance applied, returning output shape: {torch.cat([eps, rest], dim=1).shape}", 
-              file=sys.stderr, flush=True)
-        print(f"{'='*60}\n", file=sys.stderr, flush=True)
+        print(f"[CFG] ✓ Guidance applied, output: {torch.cat([eps, rest], dim=1).shape}")
+        print(f"{'='*60}\n")
         
         return torch.cat([eps, rest], dim=1)
 
