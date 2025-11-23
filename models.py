@@ -266,10 +266,18 @@ class DiT(nn.Module):
         """
         Forward pass of DiT, but also batches the unconditional forward pass for classifier-free guidance.
         """
+        import sys
+        print(f"\n{'='*60}", file=sys.stderr, flush=True)
+        print(f"[DiT CFG] Input shape: {x.shape}, CFG scale: {cfg_scale}", file=sys.stderr, flush=True)
+        print(f"{'='*60}", file=sys.stderr, flush=True)
+        
         # https://github.com/openai/glide-text2im/blob/main/notebooks/text2im.ipynb
         half = x[: len(x) // 2]
         combined = torch.cat([half, half], dim=0)
+        
+        print(f"[DiT CFG] Calling forward() with combined batch...", file=sys.stderr, flush=True)
         model_out = self.forward(combined, t, y)
+        
         # For exact reproducibility reasons, we apply classifier-free guidance on only
         # three channels by default. The standard approach to cfg applies it to all channels.
         # This can be done by uncommenting the following line and commenting-out the line following that.
@@ -278,6 +286,11 @@ class DiT(nn.Module):
         cond_eps, uncond_eps = torch.split(eps, len(eps) // 2, dim=0)
         half_eps = uncond_eps + cfg_scale * (cond_eps - uncond_eps)
         eps = torch.cat([half_eps, half_eps], dim=0)
+        
+        print(f"[DiT CFG] Guidance applied, returning output shape: {torch.cat([eps, rest], dim=1).shape}", 
+              file=sys.stderr, flush=True)
+        print(f"{'='*60}\n", file=sys.stderr, flush=True)
+        
         return torch.cat([eps, rest], dim=1)
 
 
