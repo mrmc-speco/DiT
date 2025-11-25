@@ -177,6 +177,10 @@ class DiT(nn.Module):
             DiTBlock(hidden_size, num_heads, mlp_ratio=mlp_ratio) for _ in range(depth)
         ])
         self.final_layer = FinalLayer(hidden_size, patch_size, self.out_channels)
+        
+        # Learnable skip connection scale (starts near 0)
+        self.skip_scale = nn.Parameter(torch.tensor(0.01))
+        
         self.initialize_weights()
 
     def initialize_weights(self):
@@ -248,9 +252,9 @@ class DiT(nn.Module):
         
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
-        x = x + skip                             # skip connection across all blocks
+        x = x + self.skip_scale * skip           # scaled skip connection
         
-        print(f"[DiT Forward] ✓ Skip connection applied across {len(self.blocks)} blocks", flush=True)
+        print(f"[DiT Forward] ✓ Skip connection applied across {len(self.blocks)} blocks (scale: {self.skip_scale.item():.4f})", flush=True)
         
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
         x = self.unpatchify(x)                   # (N, out_channels, H, W)
