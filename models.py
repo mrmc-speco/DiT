@@ -237,23 +237,20 @@ class DiT(nn.Module):
         t: (N,) tensor of diffusion timesteps
         y: (N,) tensor of class labels
         """
-        # Log forward pass execution (using print to stdout for notebook compatibility)
-        # stdout is used to print to the notebook
-        import sys
-        print("[DiT Forward] Batch, Timesteps: ...", file=sys.stdout)
-        print("[DiT Forward] Batch, Timesteps: ...")
+        # Log forward pass execution
+        print(f"[DiT Forward] Batch: {x.shape}, Timesteps: [{t.min().item():.0f}-{t.max().item():.0f}], Classes: {y[:min(4,len(y))].tolist()}", flush=True)
         
-        # skip = self.x_embedder(x)                                # preserve pre-block representation
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
         t = self.t_embedder(t)                   # (N, D)
         y = self.y_embedder(y, self.training)    # (N, D)
         c = t + y                                # (N, D)
+        skip = x                                 # preserve pre-block representation
         
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
-        # x = x + skip                             # skip connection across all blocks
+        x = x + skip                             # skip connection across all blocks
         
-        print(f"[DiT Forward] ✓ Skip connection applied across {len(self.blocks)} blocks")
+        print(f"[DiT Forward] ✓ Skip connection applied across {len(self.blocks)} blocks", flush=True)
         
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
         x = self.unpatchify(x)                   # (N, out_channels, H, W)
