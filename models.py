@@ -256,7 +256,7 @@ class DiT(nn.Module):
         print(f"[DiT Forward] x2 after AvgPooling: {x2.shape}", flush=True)
         x2 = x2.transpose(1, 2)  # (N, T, D)
         # add positional embedding to x2
-        x2 = x2 + self.pos_embed
+        # x2 = x2 + self.pos_embed
         print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
         print(f"[DiT Forward] x: {x.shape}", flush=True)
         
