@@ -243,7 +243,7 @@ class DiT(nn.Module):
         
         skip = self.x_embedder(x)                                 # preserve pre-block representation
         # x2 = self.x2_embedder(x)
-        print(f"[DiT Forward] x2: {x2.shape}", flush=True)
+        # print(f"[DiT Forward] x2: {x2.shape}", flush=True)
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
         t = self.t_embedder(t)                   # (N, D)
         y = self.y_embedder(y, self.training)    # (N, D)
