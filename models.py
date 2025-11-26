@@ -167,7 +167,6 @@ class DiT(nn.Module):
         self.num_heads = num_heads
 
         self.x_embedder = PatchEmbed(input_size, patch_size, in_channels, hidden_size, bias=True)
-        self.x2_embedder = PatchEmbed(input_size, patch_size//2, in_channels, hidden_size, bias=True)
         self.t_embedder = TimestepEmbedder(hidden_size)
         self.y_embedder = LabelEmbedder(num_classes, hidden_size, class_dropout_prob)
         num_patches = self.x_embedder.num_patches
@@ -231,7 +230,9 @@ class DiT(nn.Module):
         x = imgs.reshape(shape=(imgs.shape[0], c, h, p, w, p))
         # Transpose to (N, h, w, p, p, C)
         x = torch.einsum('nchpwq->nhwpqc', x)
-        x = torch.einsum('nhw(pq)c->nchwr', x) # shape (N, h, w, p*p*c) -> (N, c, h,w, p*p)
+        # Reshape to merge p*p, then rearrange: (N, h, w, p*p, c) -> (N, c, h, w, p*p)
+        x = x.reshape(imgs.shape[0], h, w, p * p, c)
+        x = torch.einsum('nhwrc->nchwr', x)  # r = p*p
     
         return x
 
