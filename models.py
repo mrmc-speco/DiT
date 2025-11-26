@@ -259,14 +259,15 @@ class DiT(nn.Module):
         x2 = x2 + self.pos_embed
         print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
         print(f"[DiT Forward] x: {x.shape}", flush=True)
-
-        for block in self.blocks:
-            x = block(x, c)                      # (N, T, D)
-        # x = x + skip  
+        
         for block in self.blocks:
             x2 = block(x2, c)                      # (N, T, D)
         
         x = x + x2
+
+        for block in self.blocks:
+            x = block(x, c)                      # (N, T, D)
+        # x = x + skip  
         print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
         print(f"[DiT Forward] x after final layer: {x.shape}", flush=True)
