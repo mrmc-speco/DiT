@@ -216,10 +216,30 @@ class DiT(nn.Module):
         nn.init.constant_(self.final_layer.linear.weight, 0)
         nn.init.constant_(self.final_layer.linear.bias, 0)
 
+    def patchify(self, imgs):
+        """
+        Convert images to patches.
+        imgs: (N, C, H, W) tensor of images
+        x: (N, c, h, w, p*p) tensor of patches
+        """
+        c = self.in_channels
+        p = self.x_embedder.patch_size[0]
+        h = w = imgs.shape[2] // p
+        assert imgs.shape[2] == imgs.shape[3] == h * p
+        
+        # Reshape to (N, C, h, p, w, p)
+        x = imgs.reshape(shape=(imgs.shape[0], c, h, p, w, p))
+        # Transpose to (N, h, w, p, p, C)
+        x = torch.einsum('nchpwq->nhwpqc', x)
+        x = torch.einsum('nhw(pq)c->nchwr', x) # shape (N, h, w, p*p*c) -> (N, c, h,w, p*p)
+    
+        return x
+
     def unpatchify(self, x):
         """
-        x: (N, T, patch_size**2 * C)
-        imgs: (N, H, W, C)
+        Convert patches back to images.
+        x: (N, T, patch_size**2 * C) tensor of patches
+        imgs: (N, C, H, W) tensor of images
         """
         c = self.out_channels
         p = self.x_embedder.patch_size[0]
@@ -241,39 +261,37 @@ class DiT(nn.Module):
         # Log forward pass execution
         print(f"[DiT Forward] Batch: {x.shape}, Timesteps: [{t.min().item():.0f}-{t.max().item():.0f}], Classes: {y[:min(4,len(y))].tolist()}", flush=True)
         
-        # skip = self.x_embedder(x)                                 # preserve pre-block representation
-        x2 = self.x2_embedder(x)
-        print(f"[DiT Forward] x2: {x2.shape}", flush=True)
+        ## start my new approach                                # preserve pre-block representation
+        x2 = self.patchify(x) # (N, c, h, w, p*p)
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
         t = self.t_embedder(t)                   # (N, D), t =
         y = self.y_embedder(y, self.training)    # (N, D)
         c = t + y                                # (N, D)
-        # Pool x2 from shape (N, 4T, D) to (N, T, D) to match x
-        # Need to transpose for avg_pool1d which expects (N, C, L) format
-        x2 = x2.transpose(1, 2)  # (N, D, 4T)
-        print(f"[DiT Forward] x2 after transpose: {x2.shape}", flush=True)
-        x2 = torch.avg_pool1d(x2, kernel_size=4, stride=4)  # (N, D, T)
-        print(f"[DiT Forward] x2 after AvgPooling: {x2.shape}", flush=True)
-        x2 = x2.transpose(1, 2)  # (N, T, D)
-        # add positional embedding to x2
-        # x2 = x2 + self.pos_embed
-        print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
-        print(f"[DiT Forward] x: {x.shape}", flush=True)
+        # apply rest of forward pass to x2 and iterate over p*p patches
+        for i in range(x2.shape[4]):
+            inner_patch = self.x_embedder(x2[:, :, :, :, i]) + self.pos_embed# (N, c, h, w, 1)
+            # sum of x2 + x2_i
+            for block in self.blocks:
+                inner_patch = block(inner_patch, c)
+            # update x with the sum of x2 + x2_i
+            x[:,i,:] = x[:,i,:] + inner_patch
         
-        for block in self.blocks:
-            x2 = block(x2, y) # (N, T, D)
+        # x shape (N, T, D)
+
         
-        x = x + x2
+            
+            
+            
+            
+        
         print(f"[DiT Forward] use x2 as skip connection", flush=True)
 
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
-        # x = x + skip  
-        print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
+       
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
-        print(f"[DiT Forward] x after final layer: {x.shape}", flush=True)
+
         x = self.unpatchify(x)                   # (N, out_channels, H, W)
-        print(f"[DiT Forward] x after unpatchify: {x.shape}", flush=True)
         return x
 
     def forward_with_cfg(self, x, t, y, cfg_scale):
