@@ -248,13 +248,14 @@ class DiT(nn.Module):
         t = self.t_embedder(t)                   # (N, D)
         y = self.y_embedder(y, self.training)    # (N, D)
         c = t + y                                # (N, D)
-        # do 1D AvgPooling on x2 and add to x, I have a tensor of shape (N, 4T,D), so I need to do 1D AvgPooling on the second dimension to have a tensor of shape (N, T,D) (as same shape as x)
-        x2 = x2.reshape(x2.shape[0], -1, x2.shape[-1])
-        print(f"[DiT Forward] x2 after reshape: {x2.shape}", flush=True)
-        x2 = torch.avg_pool1d(x2, kernel_size=2, stride=2)
+        # Pool x2 from shape (N, 4T, D) to (N, T, D) to match x
+        # Need to transpose for avg_pool1d which expects (N, C, L) format
+        x2 = x2.transpose(1, 2)  # (N, D, 4T)
+        print(f"[DiT Forward] x2 after transpose: {x2.shape}", flush=True)
+        x2 = torch.avg_pool1d(x2, kernel_size=4, stride=4)  # (N, D, T)
         print(f"[DiT Forward] x2 after AvgPooling: {x2.shape}", flush=True)
-        x2 = x2.reshape(x2.shape[0], x2.shape[1], x2.shape[-1])
-        print(f"[DiT Forward] x2 after reshape: {x2.shape}", flush=True)
+        x2 = x2.transpose(1, 2)  # (N, T, D)
+        print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
         print(f"[DiT Forward] x: {x.shape}", flush=True)
         x = x + x2
         print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
