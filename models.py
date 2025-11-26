@@ -281,6 +281,8 @@ class DiT(nn.Module):
             # update x 
             print(f"[DiT Forward] inner_patch after blocks: {inner_patch.shape}")
             print(f"[DiT Forward] x[:,i,:]: {x.shape}")
+            # calculate mean of inner_patch of dim = 1
+            inner_patch = inner_patch.mean(dim=1)
             x[:,i,:] = x[:,i,:] + inner_patch
         
         # x shape (N, T, D)
