@@ -274,26 +274,17 @@ class DiT(nn.Module):
         # apply rest of forward pass to x2 and iterate over p*p patches
         for i in range(x2.shape[4]):
             inner_patch = self.x_embedder(x2[:, :, :, :, i]) + self.pos_embed# (N, c, h, w, 1)
+            inner_c = c.repeat(1, x2.shape[4], 1)
             print(f"[DiT Forward] inner_patch: {inner_patch.shape}")
             # sum of x2 + x2_i
             for block in self.blocks:
-                inner_patch = block(inner_patch, c)
+                inner_patch = block(inner_patch, inner_c)
             # update x 
             print(f"[DiT Forward] inner_patch after blocks: {inner_patch.shape}")
             print(f"[DiT Forward] x[:,i,:]: {x.shape}")
             # calculate mean of inner_patch of dim = 1
             inner_patch = inner_patch.mean(dim=1)
             x[:,i,:] = x[:,i,:] + inner_patch
-        
-        # x shape (N, T, D)
-
-        
-            
-            
-            
-            
-        
-        print(f"[DiT Forward] use x2 as skip connection", flush=True)
 
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
