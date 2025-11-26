@@ -245,7 +245,7 @@ class DiT(nn.Module):
         x2 = self.x2_embedder(x)
         print(f"[DiT Forward] x2: {x2.shape}", flush=True)
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
-        t = self.t_embedder(t)                   # (N, D)
+        t = self.t_embedder(t)                   # (N, D), t =
         y = self.y_embedder(y, self.training)    # (N, D)
         c = t + y                                # (N, D)
         # Pool x2 from shape (N, 4T, D) to (N, T, D) to match x
@@ -260,8 +260,8 @@ class DiT(nn.Module):
         print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
         print(f"[DiT Forward] x: {x.shape}", flush=True)
         
-        # for block in self.blocks:
-        #     x2 = block(x2, c) # (N, T, D)
+        for block in self.blocks:
+            x2 = block(x2, y) # (N, T, D)
         
         x = x + x2
         print(f"[DiT Forward] use x2 as skip connection", flush=True)
