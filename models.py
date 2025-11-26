@@ -221,6 +221,9 @@ class DiT(nn.Module):
         imgs: (N, C, H, W) tensor of images
         x: (N, c, h, w, p*p) tensor of patches
         """
+        
+        # interpolate image to (N,C,2H,2W)
+        imgs = torch.nn.functional.interpolate(imgs, size=(imgs.shape[2] * 2, imgs.shape[3] * 2), mode='nearest')
         c = self.in_channels
         p = self.x_embedder.patch_size[0]
         h = w = imgs.shape[2] // p
@@ -270,7 +273,7 @@ class DiT(nn.Module):
         c = t + y                                # (N, D)
         # apply rest of forward pass to x2 and iterate over p*p patches
         for i in range(x2.shape[4]):
-            inner_patch = self.x_embedder(x2[:, :, :, :, i]) + self.pos_embed# (N, c, h, w, 1)
+            inner_patch = self.x_embedder(x2[:, :, :, :, i]) #+ self.pos_embed# (N, c, h, w, 1)
             print(f"[DiT Forward] inner_patch: {inner_patch.shape}")
             # sum of x2 + x2_i
             for block in self.blocks:
