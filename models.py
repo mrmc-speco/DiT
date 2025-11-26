@@ -177,18 +177,6 @@ class DiT(nn.Module):
             DiTBlock(hidden_size, num_heads, mlp_ratio=mlp_ratio) for _ in range(depth)
         ])
         self.final_layer = FinalLayer(hidden_size, patch_size, self.out_channels)
-        
-        # Inner DiT components for processing sub-patches
-        # Sub-patch embedder: projects each sub-patch to hidden_size
-        self.sub_patch_embedder = nn.Linear(in_channels, hidden_size, bias=True)
-        # Inner transformer blocks (fewer than outer blocks)
-        num_inner_blocks = max(1, depth // 4)  # Use 1/4 the depth for inner blocks
-        self.inner_blocks = nn.ModuleList([
-            DiTBlock(hidden_size, num_heads, mlp_ratio=mlp_ratio) for _ in range(num_inner_blocks)
-        ])
-        # Positional embedding for sub-patches within a patch
-        self.sub_pos_embed = nn.Parameter(torch.zeros(1, patch_size * patch_size, hidden_size), requires_grad=False)
-        
         self.initialize_weights()
 
     def initialize_weights(self):
@@ -203,11 +191,6 @@ class DiT(nn.Module):
         # Initialize (and freeze) pos_embed by sin-cos embedding:
         pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], int(self.x_embedder.num_patches ** 0.5))
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
-        
-        # Initialize sub_pos_embed for sub-patches
-        sub_grid_size = int(self.patch_size)  # For patch_size=2, we have 2x2 sub-patches
-        sub_pos_embed = get_2d_sincos_pos_embed(self.sub_pos_embed.shape[-1], sub_grid_size)
-        self.sub_pos_embed.data.copy_(torch.from_numpy(sub_pos_embed).float().unsqueeze(0))
 
         # Initialize patch_embed like nn.Linear (instead of nn.Conv2d):
         w = self.x_embedder.proj.weight.data
@@ -221,17 +204,8 @@ class DiT(nn.Module):
         nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
         nn.init.normal_(self.t_embedder.mlp[2].weight, std=0.02)
 
-        # Initialize sub-patch embedder:
-        nn.init.xavier_uniform_(self.sub_patch_embedder.weight)
-        nn.init.constant_(self.sub_patch_embedder.bias, 0)
-        
         # Zero-out adaLN modulation layers in DiT blocks:
         for block in self.blocks:
-            nn.init.constant_(block.adaLN_modulation[-1].weight, 0)
-            nn.init.constant_(block.adaLN_modulation[-1].bias, 0)
-        
-        # Zero-out adaLN modulation layers in inner DiT blocks:
-        for block in self.inner_blocks:
             nn.init.constant_(block.adaLN_modulation[-1].weight, 0)
             nn.init.constant_(block.adaLN_modulation[-1].bias, 0)
 
@@ -288,49 +262,33 @@ class DiT(nn.Module):
         # Log forward pass execution
         print(f"[DiT Forward] Batch: {x.shape}, Timesteps: [{t.min().item():.0f}-{t.max().item():.0f}], Classes: {y[:min(4,len(y))].tolist()}", flush=True)
         
-        ## DiT-in-DiT approach: process sub-patches with inner transformer
-        # Step 1: Save original input and patchify for sub-patch processing
-        x_orig = x  # Save original input (N, C, H, W)
-        x2 = self.patchify(x_orig)  # (N, c, h, w, p*p)
-        
-        # Step 2: Get main patch embeddings
-        x = self.x_embedder(x_orig) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
-        t = self.t_embedder(t)                   # (N, D)
+        ## start my new approach                                # preserve pre-block representation
+        x2 = self.patchify(x) # (N, c, h, w, p*p)
+        x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
+        t = self.t_embedder(t)                   # (N, D), t =
         y = self.y_embedder(y, self.training)    # (N, D)
         c = t + y                                # (N, D)
+        # apply rest of forward pass to x2 and iterate over p*p patches
+        for i in range(x2.shape[4]):
+            inner_patch = self.x_embedder(x2[:, :, :, :, i]) + self.pos_embed# (N, c, h, w, 1)
+            print(f"[DiT Forward] inner_patch: {inner_patch.shape}")
+            # sum of x2 + x2_i
+            for block in self.blocks:
+                inner_patch = block(inner_patch, c)
+            # update x 
+            print(f"[DiT Forward] inner_patch after blocks: {inner_patch.shape}")
+            print(f"[DiT Forward] x[:,i,:]: {x.shape}")
+            x[:,i,:] = x[:,i,:] + inner_patch
         
-        # Step 3: Process sub-patches with inner transformer
-        N, C, h, w, pp = x2.shape
-        T = h * w  # Total number of patches
+        # x shape (N, T, D)
+
         
-        # Reshape x2 to (N, T, p*p, c) for processing
-        x2 = x2.permute(0, 2, 3, 4, 1).reshape(N, T, pp, C)  # (N, T, p*p, c)
+            
+            
+            
+            
         
-        # Embed sub-patches: (N, T, p*p, c) -> (N, T, p*p, D)
-        x2 = self.sub_patch_embedder(x2)  # (N, T, p*p, D)
-        
-        # Add positional embeddings to sub-patches
-        x2 = x2 + self.sub_pos_embed  # (N, T, p*p, D)
-        
-        # Process each patch's sub-patches through inner transformer
-        # Reshape to (N*T, p*p, D) to process all patches in parallel
-        x2_flat = x2.reshape(N * T, pp, -1)  # (N*T, p*p, D)
-        
-        # Expand conditioning for all patches
-        c_expanded = c.unsqueeze(1).expand(-1, T, -1).reshape(N * T, -1)  # (N*T, D)
-        
-        # Apply inner transformer blocks
-        for inner_block in self.inner_blocks:
-            x2_flat = inner_block(x2_flat, c_expanded)  # (N*T, p*p, D)
-        
-        # Aggregate sub-patches (mean pooling across sub-patches)
-        x2_aggregated = x2_flat.mean(dim=1)  # (N*T, D)
-        
-        # Reshape back and add to main sequence
-        x2_aggregated = x2_aggregated.reshape(N, T, -1)  # (N, T, D)
-        x = x + x2_aggregated  # Add inner transformer output to main sequence
-        
-        print(f"[DiT Forward] Processed sub-patches with inner transformer", flush=True)
+        print(f"[DiT Forward] use x2 as skip connection", flush=True)
 
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
