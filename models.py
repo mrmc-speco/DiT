@@ -273,7 +273,7 @@ class DiT(nn.Module):
         c = t + y                                # (N, D)
         # apply rest of forward pass to x2 and iterate over p*p patches
         for i in range(x2.shape[4]):
-            inner_patch = self.x_embedder(x2[:, :, :, :, i]) #+ self.pos_embed# (N, c, h, w, 1)
+            inner_patch = self.x_embedder(x2[:, :, :, :, i]) + self.pos_embed# (N, c, h, w, 1)
             print(f"[DiT Forward] inner_patch: {inner_patch.shape}")
             # sum of x2 + x2_i
             for block in self.blocks:
