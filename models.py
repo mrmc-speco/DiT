@@ -240,11 +240,11 @@ class DiT(nn.Module):
         # Log forward pass execution
         print(f"[DiT Forward] Batch: {x.shape}, Timesteps: [{t.min().item():.0f}-{t.max().item():.0f}], Classes: {y[:min(4,len(y))].tolist()}", flush=True)
         
+        skip = self.x_embedder(x)                                 # preserve pre-block representation
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
         t = self.t_embedder(t)                   # (N, D)
         y = self.y_embedder(y, self.training)    # (N, D)
         c = t + y                                # (N, D)
-        skip = x                                 # preserve pre-block representation
         
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
