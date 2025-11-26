@@ -167,6 +167,7 @@ class DiT(nn.Module):
         self.num_heads = num_heads
 
         self.x_embedder = PatchEmbed(input_size, patch_size, in_channels, hidden_size, bias=True)
+        self.x2_embedder = PatchEmbed(input_size, patch_size//2, in_channels, hidden_size, bias=True)
         self.t_embedder = TimestepEmbedder(hidden_size)
         self.y_embedder = LabelEmbedder(num_classes, hidden_size, class_dropout_prob)
         num_patches = self.x_embedder.num_patches
@@ -240,15 +241,22 @@ class DiT(nn.Module):
         # Log forward pass execution
         print(f"[DiT Forward] Batch: {x.shape}, Timesteps: [{t.min().item():.0f}-{t.max().item():.0f}], Classes: {y[:min(4,len(y))].tolist()}", flush=True)
         
-        skip = self.x_embedder(x)                                 # preserve pre-block representation
+        # skip = self.x_embedder(x)                                 # preserve pre-block representation
+        x2 = self.x2_embedder(x)
+        print(f"[DiT Forward] x2: {x2.shape}", flush=True)
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
         t = self.t_embedder(t)                   # (N, D)
         y = self.y_embedder(y, self.training)    # (N, D)
         c = t + y                                # (N, D)
-        
+        # do 1D AvgPooling on x2 and add to x, I have a tensor of shape (N, 4T,D), so I need to do 1D AvgPooling on the second dimension to have a tensor of shape (N, T,D) (as same shape as x)
+        x2 = x2.reshape(x2.shape[0], -1, x2.shape[-1])
+        x2 = torch.avg_pool1d(x2, kernel_size=2, stride=2)
+        x2 = x2.reshape(x2.shape[0], x2.shape[1], x2.shape[-1])
+        print(f"[DiT Forward] x2 after AvgPooling: {x2.shape}", flush=True)
+        x = x + x2
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
-        x = x + skip                             # skip connection across all blocks
+        # x = x + skip                             # skip connection across all blocks
         
         print(f"[DiT Forward] ✓ Skip connection applied across {len(self.blocks)} blocks", flush=True)
         
