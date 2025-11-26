@@ -260,8 +260,8 @@ class DiT(nn.Module):
         print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
         print(f"[DiT Forward] x: {x.shape}", flush=True)
         
-        for block in self.blocks:
-            x2 = block(x2, c)                      # (N, T, D)
+        # for block in self.blocks:
+        #     x2 = block(x2, c)                      # (N, T, D)
         
         x = x + x2
 
