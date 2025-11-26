@@ -257,16 +257,19 @@ class DiT(nn.Module):
         x2 = x2.transpose(1, 2)  # (N, T, D)
         print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
         print(f"[DiT Forward] x: {x.shape}", flush=True)
-        x = x + x2
-        print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
+
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
-        # x = x + skip                             # skip connection across all blocks
+        # x = x + skip  
+        for block in self.blocks:
+            x2 = block(x2, c)                      # (N, T, D)
         
-        print(f"[DiT Forward] ✓ Skip connection applied across {len(self.blocks)} blocks", flush=True)
-        
+        x = x + x2
+        print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
+        print(f"[DiT Forward] x after final layer: {x.shape}", flush=True)
         x = self.unpatchify(x)                   # (N, out_channels, H, W)
+        print(f"[DiT Forward] x after unpatchify: {x.shape}", flush=True)
         return x
 
     def forward_with_cfg(self, x, t, y, cfg_scale):
