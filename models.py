@@ -250,10 +250,14 @@ class DiT(nn.Module):
         c = t + y                                # (N, D)
         # do 1D AvgPooling on x2 and add to x, I have a tensor of shape (N, 4T,D), so I need to do 1D AvgPooling on the second dimension to have a tensor of shape (N, T,D) (as same shape as x)
         x2 = x2.reshape(x2.shape[0], -1, x2.shape[-1])
+        print(f"[DiT Forward] x2 after reshape: {x2.shape}", flush=True)
         x2 = torch.avg_pool1d(x2, kernel_size=2, stride=2)
-        x2 = x2.reshape(x2.shape[0], x2.shape[1], x2.shape[-1])
         print(f"[DiT Forward] x2 after AvgPooling: {x2.shape}", flush=True)
+        x2 = x2.reshape(x2.shape[0], x2.shape[1], x2.shape[-1])
+        print(f"[DiT Forward] x2 after reshape: {x2.shape}", flush=True)
+        print(f"[DiT Forward] x: {x.shape}", flush=True)
         x = x + x2
+        print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
         # x = x + skip                             # skip connection across all blocks
