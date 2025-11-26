@@ -177,10 +177,6 @@ class DiT(nn.Module):
             DiTBlock(hidden_size, num_heads, mlp_ratio=mlp_ratio) for _ in range(depth)
         ])
         self.final_layer = FinalLayer(hidden_size, patch_size, self.out_channels)
-        
-        # Learnable skip projection (initialized to output zeros = no skip initially)
-        self.skip_projection = nn.Linear(hidden_size, hidden_size, bias=True)
-        
         self.initialize_weights()
 
     def initialize_weights(self):
@@ -218,10 +214,6 @@ class DiT(nn.Module):
         nn.init.constant_(self.final_layer.adaLN_modulation[-1].bias, 0)
         nn.init.constant_(self.final_layer.linear.weight, 0)
         nn.init.constant_(self.final_layer.linear.bias, 0)
-        
-        # Zero-out skip projection (starts as identity = no skip effect)
-        nn.init.constant_(self.skip_projection.weight, 0)
-        nn.init.constant_(self.skip_projection.bias, 0)
 
     def unpatchify(self, x):
         """
@@ -256,11 +248,9 @@ class DiT(nn.Module):
         
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)
+        x = x + skip                             # skip connection across all blocks
         
-        # Projected skip connection (starts at zero, can be learned)
-        x = x + self.skip_projection(skip)       # learnable skip connection
-        
-        print(f"[DiT Forward] ✓ Projected skip connection applied", flush=True)
+        print(f"[DiT Forward] ✓ Skip connection applied across {len(self.blocks)} blocks", flush=True)
         
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
         x = self.unpatchify(x)                   # (N, out_channels, H, W)
