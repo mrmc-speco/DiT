@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DiT-in-DiT vs Original DiT - Architecture Comparison</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: white;
+            padding: 20px;
+            color: black;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .panel {
+            border: 1px solid black;
+            padding: 15px;
+            background: white;
+        }
+
+        .panel-title {
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding: 8px;
+            background: #e8e8e8;
+            border: 1px solid black;
+        }
+
+        .box {
+            border: 2px solid black;
+            padding: 8px 12px;
+            margin: 6px auto;
+            text-align: center;
+            font-size: 0.9em;
+            width: 200px;
+        }
+
+        .box.input { background: #e8e8e8; }
+        .box.embedding { background: #d0e0f0; }
+        .box.transformer { background: #fff4e0; }
+        .box.inner { background: #ffe0e0; }
+        .box.aggregation { background: #e0f0e0; }
+        .box.norm { background: #e8e8e8; }
+        .box.output { background: #e8e8e8; }
+        .box.attention { background: #ffe4b5; }
+        .box.feedforward { background: #d4edda; }
+        .box.scale { background: #cce5ff; }
+
+        .arrow {
+            text-align: center;
+            font-size: 1.2em;
+            margin: 3px 0;
+            font-weight: bold;
+        }
+
+        .plus {
+            text-align: center;
+            font-size: 1.5em;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+
+        .parallel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .parallel .box {
+            width: 100%;
+        }
+
+        .block-detail {
+            margin-top: 30px;
+            padding: 15px;
+            border: 1px solid black;
+            background: #f9f9f9;
+        }
+
+        .block-detail h3 {
+            margin-bottom: 15px;
+            font-size: 1em;
+            font-weight: bold;
+        }
+
+        .detail-box {
+            border: 2px solid black;
+            padding: 6px 10px;
+            margin: 4px auto;
+            text-align: center;
+            font-size: 0.85em;
+            width: 200px;
+        }
+
+        .detail-label {
+            font-size: 0.75em;
+            margin-top: 2px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DiT-in-DiT vs Original DiT Architecture</h1>
+
+        <div class="comparison">
+            <!-- Original DiT -->
+            <div class="panel">
+                <div class="panel-title">Latent Diffusion Transformer (Original DiT)</div>
+                
+                <div class="box input">Noised Latent<br><span class="detail-label">32 × 32 × 4</span></div>
+                <div class="arrow">↓</div>
+                <div class="box embedding">Patchify</div>
+                <div class="arrow">↓</div>
+                <div class="box embedding">Timestep t</div>
+                <div class="box embedding">Label y</div>
+                <div class="arrow">↓</div>
+                <div class="box embedding">Embed</div>
+                <div class="arrow">↓</div>
+                <div class="box transformer">DiT Block<br><span class="detail-label">× N</span></div>
+                <div class="arrow">↓</div>
+                <div class="box norm">Layer Norm</div>
+                <div class="arrow">↓</div>
+                <div class="box norm">Linear and Reshape</div>
+                <div class="arrow">↓</div>
+                <div class="box output">Noise<br><span class="detail-label">32 × 32 × 4</span></div>
+                <div class="box output">Σ<br><span class="detail-label">32 × 32 × 4</span></div>
+
+                <div class="block-detail">
+                    <h3>DiT Block with adaLN-Zero</h3>
+                    <div class="detail-box norm">Input Tokens</div>
+                    <div class="detail-box norm">Conditioning</div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box norm">MLP<br><span class="detail-label">γ₁, β₁, α₁, γ₂, β₂, α₂</span></div>
+                    <div class="arrow">↓</div>
+                    <div class="plus">+</div>
+                    <div class="detail-box norm">Layer Norm</div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box scale">Scale, Shift<br><span class="detail-label">γ₁, β₁</span></div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box attention">Multi-Head Self-Attention</div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box scale">Scale<br><span class="detail-label">α₁</span></div>
+                    <div class="arrow">↓</div>
+                    <div class="plus">+</div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box norm">Layer Norm</div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box scale">Scale, Shift<br><span class="detail-label">γ₂, β₂</span></div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box feedforward">Pointwise Feedforward</div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box scale">Scale<br><span class="detail-label">α₂</span></div>
+                    <div class="arrow">↓</div>
+                    <div class="plus">+</div>
+                </div>
+            </div>
+
+            <!-- DiT-in-DiT -->
+            <div class="panel">
+                <div class="panel-title">Latent Diffusion Transformer (DiT-in-DiT)</div>
+                
+                <div class="box input">Noised Latent<br><span class="detail-label">32 × 32 × 4</span></div>
+                <div class="arrow">↓</div>
+                
+                <div style="text-align: center; font-weight: bold; margin: 10px 0; font-size: 0.9em;">Dual Processing Path</div>
+                
+                <div class="parallel">
+                    <div>
+                        <div class="box embedding">Patchify<br><span class="detail-label">Main Path</span></div>
+                        <div class="arrow">↓</div>
+                        <div class="box embedding">Position Embedding<br><span class="detail-label">(1, T, D)</span></div>
+                    </div>
+                    <div>
+                        <div class="box embedding">Patchify<br><span class="detail-label">Sub-Patch Path</span></div>
+                        <div class="arrow">↓</div>
+                        <div class="box embedding">Sub-Patch Embedding<br><span class="detail-label">Linear</span></div>
+                        <div class="arrow">↓</div>
+                        <div class="box embedding">Sub-Position Embedding<br><span class="detail-label">(1, p², D)</span></div>
+                    </div>
+                </div>
+                
+                <div class="arrow">↓</div>
+                <div class="box embedding">Timestep t</div>
+                <div class="box embedding">Label y</div>
+                <div class="arrow">↓</div>
+                <div class="box embedding">Embed</div>
+                <div class="arrow">↓</div>
+                <div class="box inner">Inner DiT Block<br><span class="detail-label">× M (M = 7)</span></div>
+                <div class="arrow">↓</div>
+                <div class="box aggregation">Aggregation<br><span class="detail-label">Mean Pooling</span></div>
+                <div class="arrow">↓</div>
+                <div class="plus">+</div>
+                <div class="box" style="background: #fff3cd; border: 2px solid black; padding: 8px 12px; margin: 6px auto; text-align: center; font-size: 0.9em; width: 200px; font-weight: bold;">Residual Fusion</div>
+                <div class="arrow">↓</div>
+                <div class="box transformer">Outer DiT Block<br><span class="detail-label">× N (N = 28)</span></div>
+                <div class="arrow">↓</div>
+                <div class="box norm">Layer Norm</div>
+                <div class="arrow">↓</div>
+                <div class="box norm">Linear and Reshape</div>
+                <div class="arrow">↓</div>
+                <div class="box output">Noise<br><span class="detail-label">32 × 32 × 4</span></div>
+                <div class="box output">Σ<br><span class="detail-label">32 × 32 × 4</span></div>
+
+                <div class="block-detail">
+                    <h3>Inner DiT Block with adaLN-Zero</h3>
+                    <div class="detail-box norm">Input Sub-Patches<br><span class="detail-label">(N×T, p², D)</span></div>
+                    <div class="detail-box norm">Conditioning</div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box norm">MLP<br><span class="detail-label">γ₁, β₁, α₁, γ₂, β₂, α₂</span></div>
+                    <div class="arrow">↓</div>
+                    <div class="plus">+</div>
+                    <div class="detail-box norm">Layer Norm</div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box scale">Scale, Shift<br><span class="detail-label">γ₁, β₁</span></div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box attention">Multi-Head Self-Attention<br><span class="detail-label">(within patch)</span></div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box scale">Scale<br><span class="detail-label">α₁</span></div>
+                    <div class="arrow">↓</div>
+                    <div class="plus">+</div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box norm">Layer Norm</div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box scale">Scale, Shift<br><span class="detail-label">γ₂, β₂</span></div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box feedforward">Pointwise Feedforward</div>
+                    <div class="arrow">↓</div>
+                    <div class="detail-box scale">Scale<br><span class="detail-label">α₂</span></div>
+                    <div class="arrow">↓</div>
+                    <div class="plus">+</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
