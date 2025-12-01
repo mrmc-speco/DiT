@@ -13,7 +13,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 import math
-from timm.models.vision_transformer import PatchEmbed, Attention, Mlp
+import timm
+from timm.models.vision_transformer import PatchEmbed, Attention, Mlp, VisionTransformer, Block
 
 
 def modulate(x, shift, scale):
@@ -177,6 +178,20 @@ class DiT(nn.Module):
         self.blocks = nn.ModuleList([
             DiTBlock(hidden_size, num_heads, mlp_ratio=mlp_ratio) for _ in range(depth)
         ])
+        # ViT block for processing x2
+        # Will be initialized with target dimensions, but may be replaced with pretrained block if dimensions differ
+        self.x2_vit_block = Block(
+            dim=hidden_size,
+            num_heads=num_heads,
+            mlp_ratio=mlp_ratio,
+            qkv_bias=True,
+            drop=0.0,
+            attn_drop=0.0,
+            drop_path=0.0,
+        )
+        # Projection layers for adapting dimensions if needed (will be created if dimensions don't match)
+        self.x2_vit_proj_in = None
+        self.x2_vit_proj_out = None
         self.final_layer = FinalLayer(hidden_size, patch_size, self.out_channels)
         self.initialize_weights()
 
@@ -215,6 +230,69 @@ class DiT(nn.Module):
         nn.init.constant_(self.final_layer.adaLN_modulation[-1].bias, 0)
         nn.init.constant_(self.final_layer.linear.weight, 0)
         nn.init.constant_(self.final_layer.linear.bias, 0)
+        
+        # Load pre-trained timm ViT weights for x2_vit_block
+        self.load_pretrained_vit_weights()
+
+    def load_pretrained_vit_weights(self, vit_model_name='vit_large_patch16_224'):
+        """
+        Load pre-trained timm ViT weights for x2_vit_block.
+        If dimensions don't match, uses projection layers to adapt.
+        """
+        try:
+            # Load pre-trained ViT model
+            print(f"[DiT] Loading pre-trained ViT model: {vit_model_name}", flush=True)
+            pretrained_vit = timm.create_model(vit_model_name, pretrained=True)
+            pretrained_vit.eval()
+            
+            # Extract the last block
+            pretrained_block = pretrained_vit.blocks[-1]
+            pretrained_dim = pretrained_vit.embed_dim
+            pretrained_num_heads = pretrained_vit.num_heads
+            
+            print(f"[DiT] Pre-trained ViT block: dim={pretrained_dim}, num_heads={pretrained_num_heads}", flush=True)
+            print(f"[DiT] Target x2_vit_block: dim={self.x2_vit_block.norm1.normalized_shape[0]}, num_heads={self.num_heads}", flush=True)
+            
+            # Check if dimensions match
+            if pretrained_dim == self.hidden_size and pretrained_num_heads == self.num_heads:
+                # Direct weight loading if dimensions match
+                print(f"[DiT] Dimensions match! Loading weights directly...", flush=True)
+                self.x2_vit_block.load_state_dict(pretrained_block.state_dict(), strict=True)
+                print(f"[DiT] ✓ Successfully loaded pre-trained ViT weights for x2_vit_block", flush=True)
+            else:
+                # Dimensions don't match - replace block with pretrained dimensions and use projection layers
+                print(f"[DiT] Dimensions don't match. Creating block with pretrained dimensions and projection layers...", flush=True)
+                
+                # Create a new block with pretrained dimensions
+                pretrained_mlp_ratio = pretrained_vit.mlp_ratio if hasattr(pretrained_vit, 'mlp_ratio') else 4.0
+                self.x2_vit_block = Block(
+                    dim=pretrained_dim,
+                    num_heads=pretrained_num_heads,
+                    mlp_ratio=pretrained_mlp_ratio,
+                    qkv_bias=True,
+                    drop=0.0,
+                    attn_drop=0.0,
+                    drop_path=0.0,
+                )
+                
+                # Load pre-trained weights into the new block
+                self.x2_vit_block.load_state_dict(pretrained_block.state_dict(), strict=True)
+                
+                # Create projection layers
+                self.x2_vit_proj_in = nn.Linear(self.hidden_size, pretrained_dim)
+                self.x2_vit_proj_out = nn.Linear(pretrained_dim, self.hidden_size)
+                # Initialize projection layers
+                nn.init.xavier_uniform_(self.x2_vit_proj_in.weight)
+                nn.init.constant_(self.x2_vit_proj_in.bias, 0)
+                nn.init.xavier_uniform_(self.x2_vit_proj_out.weight)
+                nn.init.constant_(self.x2_vit_proj_out.bias, 0)
+                
+                print(f"[DiT] ✓ Successfully loaded pre-trained ViT weights into block with dim={pretrained_dim}", flush=True)
+                print(f"[DiT] Using projection layers to adapt dimensions: {self.hidden_size} -> {pretrained_dim} -> {self.hidden_size}", flush=True)
+                
+        except Exception as e:
+            print(f"[DiT] Warning: Could not load pre-trained ViT weights: {e}", flush=True)
+            print(f"[DiT] Using randomly initialized weights for x2_vit_block", flush=True)
 
     def unpatchify(self, x):
         """
@@ -256,6 +334,14 @@ class DiT(nn.Module):
         # print(f"[DiT Forward] x2 after AvgPooling: {x2.shape}", flush=True)
         x2 = x2.transpose(1, 2)  # (N, T, D)
         print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
+        # Apply ViT block to x2 to ensure same processing as x
+        # Use projection layers if dimensions don't match
+        if self.x2_vit_proj_in is not None:
+            x2 = self.x2_vit_proj_in(x2)  # Project to pre-trained ViT dimension
+        x2 = self.x2_vit_block(x2)  # (N, T, D) - processed by pre-trained ViT block
+        if self.x2_vit_proj_out is not None:
+            x2 = self.x2_vit_proj_out(x2)  # Project back to hidden_size
+        print(f"[DiT Forward] x2 after ViT block: {x2.shape}", flush=True)
         print(f"[DiT Forward] x: {x.shape}", flush=True)
         print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
         for block in self.blocks:
