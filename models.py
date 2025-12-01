@@ -300,10 +300,7 @@ class DiT(nn.Module):
                     dim=pretrained_dim,
                     num_heads=pretrained_num_heads,
                     mlp_ratio=pretrained_mlp_ratio,
-                    qkv_bias=True,
-                    drop=0.0,
-                    attn_drop=0.0,
-                    drop_path=0.0,
+                    qkv_bias=True
                 )
                 
                 # Load pre-trained weights into the new block
