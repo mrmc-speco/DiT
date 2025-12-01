@@ -165,6 +165,7 @@ class DiT(nn.Module):
         self.in_channels = in_channels
         self.out_channels = in_channels * 2 if learn_sigma else in_channels
         self.patch_size = patch_size
+        self.hidden_size = hidden_size
         self.num_heads = num_heads
 
         self.x_embedder = PatchEmbed(input_size, patch_size, in_channels, hidden_size, bias=True)
@@ -184,10 +185,7 @@ class DiT(nn.Module):
             dim=hidden_size,
             num_heads=num_heads,
             mlp_ratio=mlp_ratio,
-            qkv_bias=True,
-            # drop=0.0,
-            # attn_drop=0.0,
-            # drop_path=0.0,
+            qkv_bias=True
         )
         # Projection layers for adapting dimensions if needed (will be created if dimensions don't match)
         self.x2_vit_proj_in = None
