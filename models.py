@@ -373,7 +373,6 @@ class DiT(nn.Module):
         print(f"[DiT Forward] x: {x.shape}", flush=True)
         print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
         for i, block in enumerate(self.blocks):
-            print(f"[DiT Forward] block {i}: {block.shape}", flush=True)
             x = block(x, c)
             if i == 0:
                 x = x + x2
