@@ -372,10 +372,14 @@ class DiT(nn.Module):
         print(f"[DiT Forward] x2 after ViT block: {x2.shape}", flush=True)
         print(f"[DiT Forward] x: {x.shape}", flush=True)
         print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
-        for block in self.blocks:
-            x = block(x, c)                      # (N, T, D)
+        for i, block in enumerate(self.blocks):
+            print(f"[DiT Forward] block {i}: {block.shape}", flush=True)
+            x = block(x, c)
+            if i == 0:
+                x = x + x2
+            # (N, T, D)
         # x = x + skip                             # skip connection across all blocks
-        x = x + x2
+        # x = x + x2
         
         print(f"[DiT Forward] ✓ Skip org connection applied across {len(self.blocks)} blocks", flush=True)
         
