@@ -185,9 +185,9 @@ class DiT(nn.Module):
             num_heads=num_heads,
             mlp_ratio=mlp_ratio,
             qkv_bias=True,
-            drop=0.0,
-            attn_drop=0.0,
-            drop_path=0.0,
+            # drop=0.0,
+            # attn_drop=0.0,
+            # drop_path=0.0,
         )
         # Projection layers for adapting dimensions if needed (will be created if dimensions don't match)
         self.x2_vit_proj_in = None
