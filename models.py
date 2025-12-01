@@ -185,9 +185,9 @@ class DiT(nn.Module):
             num_heads=num_heads,
             mlp_ratio=mlp_ratio,
             qkv_bias=True,
-            # drop=0.0,
-            # attn_drop=0.0,
-            # drop_path=0.0,
+            drop=0.0,
+            attn_drop=0.0,
+            drop_path=0.0,
         )
         # Projection layers for adapting dimensions if needed (will be created if dimensions don't match)
         self.x2_vit_proj_in = None
@@ -248,7 +248,40 @@ class DiT(nn.Module):
             # Extract the last block
             pretrained_block = pretrained_vit.blocks[-1]
             pretrained_dim = pretrained_vit.embed_dim
-            pretrained_num_heads = pretrained_vit.num_heads
+            # Get num_heads from the attention module or infer from qkv weight shape
+            pretrained_num_heads = None
+            # Try multiple ways to get num_heads
+            if hasattr(pretrained_block.attn, 'num_heads'):
+                pretrained_num_heads = pretrained_block.attn.num_heads
+            elif hasattr(pretrained_vit, 'num_heads'):
+                pretrained_num_heads = pretrained_vit.num_heads
+            else:
+                # Infer from qkv weight shape
+                # qkv weight shape is (3 * num_heads * head_dim, embed_dim)
+                # where embed_dim = num_heads * head_dim
+                # So: qkv_out_dim = 3 * embed_dim, and head_dim = embed_dim / num_heads
+                # Therefore: qkv_out_dim = 3 * num_heads * (embed_dim / num_heads) = 3 * embed_dim
+                # This means we can't directly get num_heads from qkv_out_dim alone
+                # But we can calculate: num_heads = embed_dim / head_dim
+                # And head_dim = qkv_out_dim / (3 * num_heads) = embed_dim / num_heads
+                # So: qkv_out_dim = 3 * embed_dim (always true for standard ViT)
+                # We need to infer head_dim. Standard head_dim values: 64 (most common)
+                qkv_out_dim = pretrained_block.attn.qkv.weight.shape[0]
+                # Calculate head_dim from qkv: head_dim = qkv_out_dim / (3 * num_heads)
+                # Since we don't know num_heads, let's use common defaults
+                # Common ViT configs: embed_dim 768 -> 12 heads (head_dim=64), 1024 -> 16 heads (head_dim=64)
+                if pretrained_dim == 768:
+                    pretrained_num_heads = 12
+                elif pretrained_dim == 1024:
+                    pretrained_num_heads = 16
+                elif pretrained_dim == 1280:
+                    pretrained_num_heads = 16
+                else:
+                    # Calculate: assume head_dim = 64 (most common)
+                    pretrained_num_heads = pretrained_dim // 64
+                    if pretrained_num_heads <= 0 or pretrained_num_heads > 32:
+                        pretrained_num_heads = 16  # fallback to common value
+                print(f"[DiT] Inferred num_heads={pretrained_num_heads} from embed_dim={pretrained_dim}", flush=True)
             
             print(f"[DiT] Pre-trained ViT block: dim={pretrained_dim}, num_heads={pretrained_num_heads}", flush=True)
             print(f"[DiT] Target x2_vit_block: dim={self.x2_vit_block.norm1.normalized_shape[0]}, num_heads={self.num_heads}", flush=True)
