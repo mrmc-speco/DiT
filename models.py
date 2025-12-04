@@ -361,7 +361,7 @@ class DiT(nn.Module):
         x2 = torch.avg_pool1d(x2, kernel_size=4, stride=4)  # (N, D, T)
         # print(f"[DiT Forward] x2 after AvgPooling: {x2.shape}", flush=True)
         x2 = x2.transpose(1, 2)  # (N, T, D)
-        print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
+        # print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
         # Apply ViT block to x2 to ensure same processing as x
         # Use projection layers if dimensions don't match
         if self.x2_vit_proj_in is not None:
@@ -369,9 +369,9 @@ class DiT(nn.Module):
         x2 = self.x2_vit_block(x2)  # (N, T, D) - processed by pre-trained ViT block
         if self.x2_vit_proj_out is not None:
             x2 = self.x2_vit_proj_out(x2)  # Project back to hidden_size
-        print(f"[DiT Forward] x2 after ViT block: {x2.shape}", flush=True)
-        print(f"[DiT Forward] x: {x.shape}", flush=True)
-        print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
+        # print(f"[DiT Forward] x2 after ViT block: {x2.shape}", flush=True)
+        # print(f"[DiT Forward] x: {x.shape}", flush=True)
+        # print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
         for block in self.blocks:
             x = block(x, c)
             # if i == 0:
@@ -384,7 +384,7 @@ class DiT(nn.Module):
         # x = x + skip                             # skip connection across all blocks
         x = x + x2
         
-        print(f"[DiT Forward] ✓ Skip org connection applied across {len(self.blocks)} blocks", flush=True)
+        # print(f"[DiT Forward] ✓ Skip org connection applied across {len(self.blocks)} blocks", flush=True)
         
         x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
         x = self.unpatchify(x)                   # (N, out_channels, H, W)
