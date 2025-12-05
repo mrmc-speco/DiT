@@ -357,11 +357,11 @@ class DiT(nn.Module):
         # Pool x2 from shape (N, 4T, D) to (N, T, D) to match x
         # Need to transpose for avg_pool1d which expects (N, C, L) format
         x2 = x2.transpose(1, 2)  # (N, D, 4T)
-        # print(f"[DiT Forward] x2 after transpose: {x2.shape}", flush=True)
+        print(f"[DiT Forward] x2 after transpose: {x2.shape}", flush=True)
         x2 = torch.avg_pool1d(x2, kernel_size=4, stride=4)  # (N, D, T)
-        # print(f"[DiT Forward] x2 after AvgPooling: {x2.shape}", flush=True)
+        print(f"[DiT Forward] x2 after AvgPooling: {x2.shape}", flush=True)
         x2 = x2.transpose(1, 2)  # (N, T, D)
-        # print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
+        print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
         # Apply ViT block to x2 to ensure same processing as x
         # Use projection layers if dimensions don't match
         if self.x2_vit_proj_in is not None:
@@ -369,9 +369,9 @@ class DiT(nn.Module):
         x2 = self.x2_vit_block(x2)  # (N, T, D) - processed by pre-trained ViT block
         if self.x2_vit_proj_out is not None:
             x2 = self.x2_vit_proj_out(x2)  # Project back to hidden_size
-        # print(f"[DiT Forward] x2 after ViT block: {x2.shape}", flush=True)
-        # print(f"[DiT Forward] x: {x.shape}", flush=True)
-        # print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
+        print(f"[DiT Forward] x2 after ViT block: {x2.shape}", flush=True)
+        print(f"[DiT Forward] x: {x.shape}", flush=True)
+        print(f"[DiT Forward] x after addition: {x.shape}", flush=True)
         for block in self.blocks:
             x = block(x, c)
             # if i == 0:
