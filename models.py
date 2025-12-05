@@ -360,7 +360,7 @@ class DiT(nn.Module):
         print(f"[DiT Forward] x2 after transpose: {x2.shape}", flush=True)
         # x2 = torch.avg_pool1d(x2, kernel_size=4, stride=4)  # (N, D, T)
         # print(f"[DiT Forward] x2 after AvgPooling: {x2.shape}", flush=True)
-        x2 = torch.nn.functional.interpolate(x2, scale_factor=4, mode='nearest', align_corners=False)
+        x2 = torch.nn.functional.interpolate(x2, size=256, mode='linear', align_corners=False)
         print(f"[DiT Forward] x2 after interpolate: {x2.shape}", flush=True)
         x2 = x2.transpose(1, 2)  # (N, T, D)
         print(f"[DiT Forward] x2 after transpose back: {x2.shape}", flush=True)
