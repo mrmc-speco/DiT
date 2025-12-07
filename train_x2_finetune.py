@@ -150,7 +150,7 @@ def main(args):
     logger.info("Freezing main DiT model...")
     for p in model.parameters():
         p.requires_grad = False
-    
+
     logger.info("Unfreezing x2 components...")
     # Unfreeze x2_embedder
     for p in model.x2_embedder.parameters():
@@ -158,7 +158,7 @@ def main(args):
     
     # Unfreeze x2_vit_block
     for p in model.x2_vit_block.parameters():
-        p.requires_grad = True
+        p.requires_grad = False
         
     # Unfreeze projections if they exist
     if model.x2_vit_proj_in is not None:
@@ -170,6 +170,11 @@ def main(args):
         logger.info("Unfreezing x2_vit_proj_out...")
         for p in model.x2_vit_proj_out.parameters():
             p.requires_grad = True
+    
+    # Unfreeze final_layer to allow output adaptation
+    logger.info("Unfreezing final_layer...")
+    for p in model.final_layer.parameters():
+        p.requires_grad = True
             
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total_params = sum(p.numel() for p in model.parameters())

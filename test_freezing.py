@@ -35,30 +35,34 @@ def verify_freezing():
     if model.x2_vit_proj_out is not None:
         for p in model.x2_vit_proj_out.parameters():
             p.requires_grad = True
+    
+    # Unfreeze final_layer
+    for p in model.final_layer.parameters():
+        p.requires_grad = True
     # -----------------------------------------
 
     print("Verifying parameters...")
     
-    # 1. Verify backbone is frozen
+    # 1. Verify backbone is frozen (excluding final_layer which is trainable)
     frozen_params = [
         model.x_embedder.proj.weight,
         model.t_embedder.mlp[0].weight,
-        model.blocks[0].attn.qkv.weight,
-        model.final_layer.linear.weight
+        model.blocks[0].attn.qkv.weight
     ]
     for p in frozen_params:
         assert not p.requires_grad, f"Backbone parameter {p.shape} should be frozen!"
         
-    # 2. Verify x2 branch is unfrozen
+    # 2. Verify x2 branch and final_layer are unfrozen
     unfrozen_params = [
         model.x2_embedder.proj.weight,
-        model.x2_vit_block.norm1.weight
+        model.x2_vit_block.norm1.weight,
+        model.final_layer.linear.weight  # final_layer should be trainable
     ]
     if model.x2_vit_proj_in is not None:
         unfrozen_params.append(model.x2_vit_proj_in.weight)
 
     for p in unfrozen_params:
-        assert p.requires_grad, f"x2 parameter {p.shape} should be unfrozen!"
+        assert p.requires_grad, f"Trainable parameter {p.shape} should be unfrozen!"
         
     print("SUCCESS: Freezing logic verified correctly.")
     
