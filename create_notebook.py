@@ -34,7 +34,7 @@ def create_notebook():
         "# %cd YOUR_REPO\n",
         "#\n",
         "# Option 2: For now, we clone the base DiT repo and overwrite with your custom files:\n",
-        "!git clone https://github.com/facebookresearch/DiT.git\n",
+        "!git clone -b vit-side https://github.com/mrmc-speco/DiT.git\n",
         "%cd DiT\n",
         "\n",
         "# The next cells will overwrite models.py (with x2 modifications) and add new scripts"
@@ -144,13 +144,13 @@ def create_notebook():
     
     # 6. Run Training
     train_source = [
-        "# Run Fine-Tuning\n",
-        "# Using ImageNet validation set organized above\n",
+        "# Run Fine-Tuning on x2 block only\n",
+        "# Using ImageNet validation set (adjust --classes to your desired classes)\n",
         "!torchrun --nnodes=1 --nproc_per_node=1 train_x2_finetune.py \\\n",
         "    --model DiT-XL/2 \\\n",
         "    --data-path ./imagenet_val_organized \\\n",
         "    --classes 0 1 2 3 4 5 6 7 8 9 \\\n",
-        "    --epochs 1 \\\n",
+        "    --epochs 2 \\\n",
         "    --global-batch-size 4 \\\n",
         "    --log-every 10"
     ]
