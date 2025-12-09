@@ -355,7 +355,7 @@ class DiT(nn.Module):
         # Pool x2 from shape (N, 4T, D) to (N, T, D) to match x
         # Need to transpose for avg_pool1d which expects (N, C, L) format
         x2 = x2.transpose(1, 2)  # (N, D, 4T)
-        x2 = torch.nn.functional.interpolate(x2, size=256, mode='linear', align_corners=False)
+        x2 = torch.avg_pool1d(x2, kernel_size=4, stride=4) 
         x2 = x2.transpose(1, 2)  # (N, T, D)
         # Apply ViT block to x2 to ensure same processing as x
         # Use projection layers if dimensions don't match
