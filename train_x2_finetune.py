@@ -31,6 +31,7 @@ import os
 from models import DiT_models
 from diffusion import create_diffusion
 from diffusers.models import AutoencoderKL
+from download import find_model
 
 
 #################################################################################
@@ -145,6 +146,27 @@ def main(args):
         num_classes=args.num_classes
     )
     # Note that parameter initialization is done within the DiT constructor
+    
+    # Load base pre-trained DiT model if provided
+    if args.pretrained_ckpt is not None:
+        logger.info(f"Loading base pre-trained model from {args.pretrained_ckpt}...")
+        base_state_dict = find_model(args.pretrained_ckpt)
+        missing_keys, unexpected_keys = model.load_state_dict(base_state_dict, strict=False)
+        if missing_keys:
+            logger.warning(f"Missing keys when loading base model (will use random init): {len(missing_keys)} keys")
+            # Filter out x2-related keys as they might not exist in base model
+            x2_missing = [k for k in missing_keys if 'x2' in k]
+            other_missing = [k for k in missing_keys if 'x2' not in k]
+            if other_missing:
+                logger.warning(f"Non-x2 missing keys: {other_missing[:5]}...")  # Show first 5
+            if x2_missing:
+                logger.info(f"x2-related keys missing (expected): {len(x2_missing)} keys")
+        if unexpected_keys:
+            logger.warning(f"Unexpected keys in base model: {len(unexpected_keys)} keys")
+        logger.info("✓ Base pre-trained model loaded successfully")
+    else:
+        logger.warning("⚠️  No pre-trained checkpoint provided! Model will start with random weights.")
+        logger.warning("⚠️  Fine-tuning without base weights will result in poor generation quality.")
     
     # --- FREEZING LOGIC START ---
     logger.info("Freezing main DiT model...")
@@ -358,6 +380,8 @@ if __name__ == "__main__":
     
     # New arguments
     parser.add_argument("--classes", type=int, nargs="+", default=list(range(10)), help="List of ImageNet class indices to train on (default: 0-9)")
+    parser.add_argument("--pretrained-ckpt", type=str, default=None, 
+                        help="Path to base pre-trained DiT checkpoint (e.g., DiT-XL-2-256x256.pt). Required for proper fine-tuning.")
 
     args = parser.parse_args()
     main(args)
