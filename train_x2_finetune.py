@@ -240,11 +240,13 @@ def main(args):
     log_steps = 0
     running_loss = 0
     start_time = time()
+    best_loss = float('inf')  # Track best loss for saving best checkpoint
 
     logger.info(f"Training for {args.epochs} epochs...")
     for epoch in range(args.epochs):
         sampler.set_epoch(epoch)
         logger.info(f"Beginning epoch {epoch}...")
+        print(f"Beginning epoch {epoch}...")
         for x, y in loader:
             x = x.to(device)
             y = y.to(device)
@@ -259,7 +261,7 @@ def main(args):
             loss.backward()
             opt.step()
             update_ema(ema, model.module)
-
+            print(f"Loss: {loss.item()}")
             # Log loss values:
             running_loss += loss.item()
             log_steps += 1
@@ -276,12 +278,35 @@ def main(args):
                 logger.info(f"(step={train_steps:07d}) Train Loss: {avg_loss:.4f}, Train Steps/Sec: {steps_per_sec:.2f}")
                 # Force print to console (bypasses logger buffering in Colab)
                 print(f"✓ Step {train_steps:07d} | Loss: {avg_loss:.4f} | Steps/Sec: {steps_per_sec:.2f}", flush=True)
+                
+                # Save best checkpoint if loss improved
+                if rank == 0 and avg_loss < best_loss:
+                    best_loss = avg_loss
+                    # Only save weights that were trainable to save space
+                    trainable_keys = [k for k, p in model.module.named_parameters() if p.requires_grad]
+                    model_state = {k: v for k, v in model.module.state_dict().items() if k in trainable_keys}
+                    
+                    checkpoint = {
+                        "model": model_state,
+                        "ema": ema.state_dict(),
+                        "opt": opt.state_dict(),
+                        "args": args,
+                        "x2_finetune_only": True,
+                        "step": train_steps,
+                        "loss": avg_loss,
+                        "best": True
+                    }
+                    best_checkpoint_path = f"{checkpoint_dir}/best.pt"
+                    torch.save(checkpoint, best_checkpoint_path)
+                    logger.info(f"Saved BEST checkpoint to {best_checkpoint_path} (Loss: {avg_loss:.4f})")
+                    print(f"🏆 New best checkpoint saved! Loss: {avg_loss:.4f}", flush=True)
+                
                 # Reset monitoring variables:
                 running_loss = 0
                 log_steps = 0
                 start_time = time()
 
-            # Save DiT checkpoint:
+            # Save DiT checkpoint (periodic):
             if train_steps % args.ckpt_every == 0 and train_steps > 0:
                 if rank == 0:
                     # Only save weights that were trainable to save space
@@ -300,7 +325,8 @@ def main(args):
                         "ema": ema.state_dict(),
                         "opt": opt.state_dict(),
                         "args": args,
-                        "x2_finetune_only": True
+                        "x2_finetune_only": True,
+                        "step": train_steps
                     }
                     checkpoint_path = f"{checkpoint_dir}/{train_steps:07d}.pt"
                     torch.save(checkpoint, checkpoint_path)
