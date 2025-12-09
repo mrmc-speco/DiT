@@ -318,7 +318,7 @@ def main(args):
                         "loss": avg_loss,
                         "best": True
                     }
-                    best_checkpoint_path = f"{checkpoint_dir}/best.pt"
+                    best_checkpoint_path = f"{checkpoint_dir}/epoch-{epoch}-loss-{best_loss:.4f}.pt"
                     torch.save(checkpoint, best_checkpoint_path)
                     logger.info(f"Saved BEST checkpoint to {best_checkpoint_path} (Loss: {avg_loss:.4f})")
                     print(f"🏆 New best checkpoint saved! Loss: {avg_loss:.4f}", flush=True)
