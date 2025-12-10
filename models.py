@@ -159,7 +159,7 @@ class DiT(nn.Module):
         class_dropout_prob=0.1,
         num_classes=1000,
         learn_sigma=True,
-        x2_fuse_every=1,           # >0 to fuse x2 into x every N blocks (early/throughout)
+        x2_fuse_every=0,           # >0 to fuse x2 into x every N blocks (early/throughout)
         x2_condition_with_c=True,  # True to FiLM-condition x2 with t+y before its ViT block
         x2_final_fuse=True,        # keep the final add of x2 after all blocks
     ):
