@@ -372,7 +372,7 @@ class DiT(nn.Module):
         x2 = torch.avg_pool1d(x2, kernel_size=4, stride=4) 
         x2 = x2.transpose(1, 2)  # (N, T, D)
         # Inject positional info so x2 tokens carry spatial cues like x
-        x2 = x2 + self.pos_embed
+        # x2 = x2 + self.pos_embed # turn off for now because it increases FID
         # Optionally condition x2 on c via FiLM before the ViT block
         if self.x2_film is not None:
             shift, scale = self.x2_film(c).chunk(2, dim=1)
