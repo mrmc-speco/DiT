@@ -159,6 +159,9 @@ class DiT(nn.Module):
         class_dropout_prob=0.1,
         num_classes=1000,
         learn_sigma=True,
+        x2_fuse_every=1,           # >0 to fuse x2 into x every N blocks (early/throughout)
+        x2_condition_with_c=True,  # True to FiLM-condition x2 with t+y before its ViT block
+        x2_final_fuse=True,        # keep the final add of x2 after all blocks
     ):
         super().__init__()
         self.learn_sigma = learn_sigma
@@ -187,9 +190,20 @@ class DiT(nn.Module):
             mlp_ratio=mlp_ratio,
             qkv_bias=True
         )
+        # Optional FiLM to condition x2 on c (t+y)
+        self.x2_condition_with_c = x2_condition_with_c
+        if self.x2_condition_with_c:
+            self.x2_film = nn.Sequential(
+                nn.SiLU(),
+                nn.Linear(hidden_size, 2 * hidden_size, bias=True)
+            )
+        else:
+            self.x2_film = None
         # Projection layers for adapting dimensions if needed (will be created if dimensions don't match)
         self.x2_vit_proj_in = None
         self.x2_vit_proj_out = None
+        self.x2_fuse_every = x2_fuse_every
+        self.x2_final_fuse = x2_final_fuse
         self.final_layer = FinalLayer(hidden_size, patch_size, self.out_channels)
         self.initialize_weights()
 
@@ -357,6 +371,12 @@ class DiT(nn.Module):
         x2 = x2.transpose(1, 2)  # (N, D, 4T)
         x2 = torch.avg_pool1d(x2, kernel_size=4, stride=4) 
         x2 = x2.transpose(1, 2)  # (N, T, D)
+        # Inject positional info so x2 tokens carry spatial cues like x
+        x2 = x2 + self.pos_embed
+        # Optionally condition x2 on c via FiLM before the ViT block
+        if self.x2_film is not None:
+            shift, scale = self.x2_film(c).chunk(2, dim=1)
+            x2 = modulate(x2, shift, scale)
         # Apply ViT block to x2 to ensure same processing as x
         # Use projection layers if dimensions don't match
         if self.x2_vit_proj_in is not None:
@@ -364,17 +384,12 @@ class DiT(nn.Module):
         x2 = self.x2_vit_block(x2)  # (N, T, D) - processed by pre-trained ViT block
         if self.x2_vit_proj_out is not None:
             x2 = self.x2_vit_proj_out(x2)  # Project back to hidden_size
-        for block in self.blocks:
+        for i, block in enumerate(self.blocks):
             x = block(x, c)
-            # if i == 0:
-            # x = x + x2
-        # for i, block in enumerate(self.blocks):
-        #     x = block(x, c)
-        #     if i == 0:
-        #         x = x + x2
-            # (N, T, D)
-        # x = x + skip                             # skip connection across all blocks
-        x = x + x2
+            if self.x2_fuse_every and (i + 1) % self.x2_fuse_every == 0:
+                x = x + x2
+        if self.x2_final_fuse:
+            x = x + x2
         
         # print(f"[DiT Forward] ✓ Skip org connection applied across {len(self.blocks)} blocks", flush=True)
         
